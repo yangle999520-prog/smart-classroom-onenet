@@ -1,5 +1,11 @@
 <template>
 	<view class="page">
+		<!-- 设备状态栏 -->
+		<view class="status-bar" :class="deviceOnline ? 'status-online' : 'status-offline'">
+			<view class="status-dot"></view>
+			<text class="status-text">{{ deviceOnline ? '设备在线' : '设备离线' }}</text>
+		</view>
+
 		<view class="header">
 			<text class="header-title">智能教室管理系统</text>
 			<text class="header-subtitle">设备控制面板</text>
@@ -18,14 +24,14 @@
 			<view class="mode-segment">
 				<view
 					class="mode-seg-btn"
-					:class="{ 'mode-seg-active': mode === 'auto' }"
+					:class="{ 'mode-seg-active': mode === 'auto', 'mode-seg-disabled': !deviceOnline }"
 					@tap="setMode('auto')"
 				>
 					<text class="mode-seg-text">自动</text>
 				</view>
 				<view
 					class="mode-seg-btn"
-					:class="{ 'mode-seg-active': mode === 'manual' }"
+					:class="{ 'mode-seg-active': mode === 'manual', 'mode-seg-disabled': !deviceOnline }"
 					@tap="setMode('manual')"
 				>
 					<text class="mode-seg-text">手动</text>
@@ -84,7 +90,7 @@
 				</view>
 			</view>
 			<view class="lamp-switch-area">
-				<switch :checked="led" :disabled="mode === 'auto'" @change="onLedSwitch" />
+				<switch :checked="led" :disabled="mode === 'auto' || !deviceOnline" @change="onLedSwitch" />
 			</view>
 		</view>
 
@@ -114,7 +120,11 @@
 				lastUpdateTime: '',
 				mode: 'auto',
 				isOperating: false, 
-				lockTimer: null
+				lockTimer: null,
+				/** 设备是否在线（从 OneNET /device/detail API 获取） */
+				deviceOnline: true,
+				/** 设备状态文本 */
+				deviceStatusText: '在线'
 			}
 		},
 		computed: {
@@ -134,9 +144,13 @@
 		},
 		onShow(){
 			this.fetchDevData();
+			this.checkDeviceStatus();
 			setInterval(()=>{
 				this.fetchDevData();
 			},3000)
+			setInterval(()=>{
+				this.checkDeviceStatus();
+			},10000)
 		},
 		methods: {
 			startOperatingLock() {
@@ -146,6 +160,40 @@
 					this.isOperating = false;
 				}, 3500);
 			},
+
+			/** 查询设备在线状态（OneNET /device/detail API） */
+			checkDeviceStatus() {
+				uni.request({
+					url: 'https://iot-api.heclouds.com/device/detail', 
+					method:'GET',
+					data: {
+						product_id:'6x3n4Y0FuX',
+						device_name:'D1'
+					},
+					header: {
+						'authorization': this.token 
+					},
+					success: (res) => {
+						if(res.data && res.data.data) {
+							const status = res.data.data.status;
+							// status: 0=离线, 1=在线, 2=未激活
+							this.deviceOnline = (status === 1);
+							switch(status) {
+								case 0: this.deviceStatusText = '离线'; break;
+								case 1: this.deviceStatusText = '在线'; break;
+								case 2: this.deviceStatusText = '未激活'; break;
+								default: this.deviceStatusText = '未知'; break;
+							}
+						}
+					},
+					fail: () => {
+						// 请求失败时认为设备离线
+						this.deviceOnline = false;
+						this.deviceStatusText = '查询失败';
+					}
+				});
+			},
+
 			fetchDevData(){
 				uni.request({
 					url: 'https://iot-api.heclouds.com/thingmodel/query-device-property', 
@@ -195,6 +243,15 @@
 					return;
 				}
 
+				// 设备离线时禁止控制
+				if (!this.deviceOnline) {
+					uni.showToast({
+						title: '设备已离线，无法控制',
+						icon: 'none'
+					});
+					return;
+				}
+
 				let value = event.detail.value; 
 				
 				this.startOperatingLock();
@@ -217,6 +274,15 @@
 				});
 			},
 			setMode(m) {
+				// 设备离线时禁止控制
+				if (!this.deviceOnline) {
+					uni.showToast({
+						title: '设备已离线，无法控制',
+						icon: 'none'
+					});
+					return;
+				}
+
 				this.startOperatingLock();
 				this.mode = m;
 				
@@ -259,6 +325,51 @@
 		background-color: #1a1a2e;
 		padding: 32rpx 28rpx;
 		box-sizing: border-box;
+	}
+
+	/* ==================== 设备状态栏 ==================== */
+	.status-bar {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		padding: 12rpx 0;
+		margin-bottom: 8rpx;
+		border-radius: 12rpx;
+	}
+	.status-bar.status-online {
+		background-color: rgba(76, 175, 80, 0.12);
+	}
+	.status-bar.status-offline {
+		background-color: rgba(244, 67, 54, 0.15);
+	}
+	.status-dot {
+		width: 14rpx;
+		height: 14rpx;
+		border-radius: 50%;
+		margin-right: 10rpx;
+	}
+	.status-online .status-dot {
+		background-color: #4caf50;
+		box-shadow: 0 0 12rpx rgba(76, 175, 80, 0.6);
+		animation: pulse 2s infinite;
+	}
+	.status-offline .status-dot {
+		background-color: #f44336;
+	}
+	.status-text {
+		font-size: 26rpx;
+		font-weight: 500;
+	}
+	.status-online .status-text {
+		color: #4caf50;
+	}
+	.status-offline .status-text {
+		color: #f44336;
+	}
+	@keyframes pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.4; }
 	}
 
 	/* 顶部标题 */
@@ -372,6 +483,9 @@
 	}
 	.mode-seg-btn.mode-seg-active {
 		background-color: #2196f3;
+	}
+	.mode-seg-btn.mode-seg-disabled {
+		opacity: 0.4;
 	}
 	.mode-seg-text {
 		font-size: 24rpx;

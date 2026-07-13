@@ -24,27 +24,18 @@ spring:
 # ==================== 数据模拟器配置 ====================
 # 接入真实OneNET后设为false，避免重复数据
 simulator:
-  enabled: true
+  enabled: false
 
-# ==================== 方式一：MQTT订阅（实时推送） ====================
-mqtt:
-  broker:
-    server:                                    # OneNET MQTT地址（需从平台确认）
-    port: 1883
-    client-id:                                 # 设备名称 D1
-    username:                                  # 产品ID 6x3n4Y0FuX
-    password:                                  # 设备密钥
-    topic:                                     # 订阅主题
-    qos: 1
-
-# ==================== 方式二：HTTP API轮询（已配置，可直接使用） ====================
+# ==================== OneNET HTTP API 数据拉取 ====================
 # 与小程序使用完全相同的接口，自动生成签名token
 # 当前已用你的真实参数配置完毕，重启后端即可运行！
 onenet:
   api:
-    enabled: true                              # ✅ 已启用
+    enabled: false                              # ✅ 已启用
     base-url: https://iot-api.heclouds.com
     product-id: 6x3n4Y0FuX                    # ✅ 你的产品ID
     device-name: D1                            # ✅ 你的设备名称
     access-key: mVGNFVfJaWdrvdWZPftvTauZ5b0ZU8mVyRlD5SEr5Vc=  # ✅ 你的AccessKey
     version: 2022-05-01                        # ✅ API版本
+
+

@@ -52,6 +52,11 @@ export function uploadSensorData(data) {
   return request.post('/sensor/upload', data)
 }
 
+/** 获取设备在线状态 */
+export function getDeviceStatus() {
+  return request.get('/sensor/device-status')
+}
+
 /**
  * 格式化时间
  */

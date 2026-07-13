@@ -12,16 +12,18 @@ import java.util.Random;
 
 /**
  * 数据模拟器
- * 在开发/测试环境中自动生成模拟传感器数据（光照值为百分比 0~100）
- * 通过配置 simulator.enabled=true 启用
+ * 在开发/调试阶段生成模拟传感器数据，支持脱离硬件独立运行
+ *
+ * 启动时一次性生成过去24小时的模拟数据（每10分钟一条，共144条）
+ * 模拟温度和光照的昼夜变化规律，更贴近真实场景
  */
 @Component
 @ConditionalOnProperty(name = "simulator.enabled", havingValue = "true")
 public class DataSimulator implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataSimulator.class);
+
     private final SensorDataService sensorDataService;
-    private final Random random = new Random();
 
     public DataSimulator(SensorDataService sensorDataService) {
         this.sensorDataService = sensorDataService;
@@ -29,60 +31,64 @@ public class DataSimulator implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        log.info("==================== 数据模拟器已启动 ====================");
-        log.info("正在生成模拟传感器数据（光照值: 0~100%）...");
+        log.info("======================================================");
+        log.info("🚀 数据模拟器已启动，开始生成模拟数据...");
 
-        int count = 0;
+        long existingCount = sensorDataService.getStatistics().getOrDefault("totalRecords", 0) instanceof Number
+                ? ((Number) sensorDataService.getStatistics().getOrDefault("totalRecords", 0)).longValue()
+                : 0;
 
-        // 生成过去24小时的模拟数据（每10分钟一条）
-        LocalDateTime baseTime = LocalDateTime.now().minusHours(24);
-        for (int i = 0; i < 144; i++) {
-            LocalDateTime time = baseTime.plusMinutes(i * 10);
-
-            // 模拟一天内的温度变化（22~32度）
-            double hourFactor = Math.sin(Math.PI * time.getHour() / 24);
-            float temperature = 24.0f + (float) (hourFactor * 5.0f) + (float) (random.nextGaussian() * 0.5);
-
-            // 模拟光照变化（百分比 0~100，白天高，夜晚低）
-            int hour = time.getHour();
-            int light;
-            int ledStatus;
-            int mode = 0;   // 默认自动模式
-            if (hour >= 8 && hour <= 18) {
-                // 白天：60~100%
-                light = 60 + random.nextInt(41);
-                ledStatus = 0;
-            } else if (hour >= 6 && hour < 8) {
-                // 清晨：15~45%
-                light = 15 + random.nextInt(31);
-                ledStatus = light < 30 ? 1 : 0;
-            } else if (hour > 18 && hour <= 20) {
-                // 傍晚：10~35%
-                light = 10 + random.nextInt(26);
-                ledStatus = 1;
-            } else {
-                // 夜晚：0~15%
-                light = random.nextInt(16);
-                ledStatus = 1;
-            }
-
-            // 偶尔加入异常数据测试滤波
-            if (i % 50 == 0) {
-                temperature += 5.0f;
-            }
-
-            SensorData data = new SensorData();
-            data.setTemperature((float) Math.round(temperature * 10) / 10.0f);
-            data.setLight(light);
-            data.setLedStatus(ledStatus);
-            data.setMode(mode);
-            data.setCreateTime(time);
-
-            sensorDataService.saveData(data);
-            count++;
+        if (existingCount > 10) {
+            log.info("⏭️ 数据库中已有 {} 条数据，跳过模拟数据生成", existingCount);
+            return;
         }
 
-        log.info("数据模拟完成！共生成 {} 条传感器数据", count);
+        Random random = new Random(42); // 固定种子，每次生成一致的数据
+        LocalDateTime now = LocalDateTime.now();
+        int totalGenerated = 0;
+
+        // 生成过去24小时的数据，每10分钟一条
+        for (int i = 143; i >= 0; i--) {
+            LocalDateTime time = now.minusMinutes(i * 10L);
+
+            // 模拟昼夜温度变化：白天高、夜间低
+            int hour = time.getHour();
+            double baseTemp;
+            if (hour >= 8 && hour <= 18) {          // 白天（8:00-18:00）
+                baseTemp = 26.0 + 4.0 * Math.sin((hour - 8) * Math.PI / 10);
+            } else if (hour >= 19 || hour <= 5) {    // 夜间（19:00-05:00）
+                baseTemp = 22.0 - 2.0 * Math.sin((hour - 19) * Math.PI / 10);
+            } else {                                   // 清晨（6:00-7:00）
+                baseTemp = 20.0 + 3.0 * (hour - 6);
+            }
+            float temperature = (float) (baseTemp + random.nextGaussian() * 0.8);
+
+            // 模拟光照变化：白天有光照、夜间无光照
+            int light;
+            if (hour >= 8 && hour <= 18) {
+                // 白天：光照 40-100%，模拟教室窗帘/天气变化
+                light = 40 + random.nextInt(61);
+            } else if (hour >= 6 && hour <= 7) {
+                // 清晨：光照 10-40%
+                light = 10 + random.nextInt(31);
+            } else {
+                // 夜间：光照 0-15%
+                light = random.nextInt(16);
+            }
+
+            // LED状态：光照<30% 且为自动模式时开灯
+            int ledStatus = (light < 30) ? 1 : 0;
+
+            // 工作模式：大部分时间为自动模式(0)
+            int mode = random.nextInt(10) == 0 ? 1 : 0;
+
+            SensorData data = new SensorData(temperature, light, ledStatus, mode);
+            data.setCreateTime(time);
+            sensorDataService.saveData(data);
+            totalGenerated++;
+        }
+
+        log.info("✅ 数据模拟器完成，共生成了 {} 条模拟数据（24小时 / 每10分钟）", totalGenerated);
         log.info("======================================================");
     }
 }

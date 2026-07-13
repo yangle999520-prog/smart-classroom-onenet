@@ -12,7 +12,7 @@
         </span>
         <span class="status-badge" :class="connected ? 'online' : 'offline'">
           <span class="status-dot"></span>
-          {{ connected ? '系统在线' : '等待数据' }}
+          {{ connected ? '设备在线' : '设备离线' }}
         </span>
       </div>
     </div>
@@ -265,15 +265,27 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { getLatestData, getHistoryData, getStatistics, getDataList, formatTime } from '@/api/request'
+import { getLatestData, getHistoryData, getStatistics, getDataList, getDeviceStatus, formatTime } from '@/api/request'
 
 // ==================== 状态变量 ====================
 const latestData = ref({})
 const statistics = ref({})
 const recentList = ref([])
-const connected = ref(false)
+
+/** 设备在线状态（来自 OneNET 平台 /device/detail API） */
+const deviceStatus = ref({
+  online: false,
+  status: -1,
+  deviceName: '',
+  statusText: '未知',
+  lastTime: null
+})
+
+/** 连接状态基于后端返回的在线检测 */
+const connected = computed(() => deviceStatus.value.online)
 
 let pollTimer = null
+let deviceStatusTimer = null
 
 // ==================== 温度状态 ====================
 const tempStatus = computed(() => {
@@ -360,7 +372,6 @@ async function loadData() {
 
     if (latest) {
       latestData.value = latest
-      connected.value = true
     }
 
     if (stats) {
@@ -375,17 +386,37 @@ async function loadData() {
   }
 }
 
+// ==================== 设备状态检测 ====================
+async function checkDeviceStatus() {
+  try {
+    const status = await getDeviceStatus()
+    if (status) {
+      deviceStatus.value = status
+    }
+  } catch (e) {
+    // 后端不可达时设备视为离线
+    deviceStatus.value.online = false
+  }
+}
+
 // ==================== 生命周期 ====================
 onMounted(() => {
   loadData()
+  checkDeviceStatus()
   // 每10秒轮询最新数据
   pollTimer = setInterval(loadData, 10000)
+  // 每10秒检测设备在线状态
+  deviceStatusTimer = setInterval(checkDeviceStatus, 10000)
 })
 
 onUnmounted(() => {
   if (pollTimer) {
     clearInterval(pollTimer)
     pollTimer = null
+  }
+  if (deviceStatusTimer) {
+    clearInterval(deviceStatusTimer)
+    deviceStatusTimer = null
   }
 })
 </script>

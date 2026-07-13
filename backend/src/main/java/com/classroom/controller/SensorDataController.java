@@ -1,6 +1,7 @@
 package com.classroom.controller;
 
 import com.classroom.entity.SensorData;
+import com.classroom.service.OneNetApiService;
 import com.classroom.service.SensorDataService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,14 +12,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+
 @RestController
 @RequestMapping("/api/sensor")
 public class SensorDataController {
 
     private final SensorDataService sensorDataService;
+    private final OneNetApiService oneNetApiService;
 
-    public SensorDataController(SensorDataService sensorDataService) {
+    public SensorDataController(SensorDataService sensorDataService,
+                                OneNetApiService oneNetApiService) {
         this.sensorDataService = sensorDataService;
+        this.oneNetApiService = oneNetApiService;
     }
 
     // ==================== 数据上传接口 ====================
@@ -94,12 +100,13 @@ public class SensorDataController {
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
         Map<String, Object> response = new HashMap<>();
-        List<SensorData> list = sensorDataService.getAllData(page, size);
+        Page<SensorData> pageResult = sensorDataService.getAllData(page, size);
 
         response.put("code", 200);
-        response.put("data", list);
+        response.put("data", pageResult.getContent());
         response.put("page", page);
         response.put("size", size);
+        response.put("total", pageResult.getTotalElements());
         return ResponseEntity.ok(response);
     }
 
@@ -111,6 +118,26 @@ public class SensorDataController {
 
         response.put("code", 200);
         response.put("data", stats);
+        return ResponseEntity.ok(response);
+    }
+
+    // ==================== 设备在线状态接口 ====================
+
+    /**
+     * 获取设备在线状态
+     * 通过 OneNET 平台 /device/detail API 查询设备真实状态
+     *
+     * GET /api/sensor/device-status
+     *
+     * @return { online, status, deviceName, statusText, lastTime }
+     */
+    @GetMapping("/device-status")
+    public ResponseEntity<Map<String, Object>> getDeviceStatus() {
+        Map<String, Object> response = new HashMap<>();
+        Map<String, Object> status = oneNetApiService.checkDeviceStatus();
+
+        response.put("code", 200);
+        response.put("data", status);
         return ResponseEntity.ok(response);
     }
 }

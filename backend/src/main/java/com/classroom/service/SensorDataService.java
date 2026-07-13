@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+
 @Service
 public class SensorDataService {
 
@@ -43,11 +45,11 @@ public class SensorDataService {
     }
 
     /** 分页查询所有数据 */
-    public List<SensorData> getAllData(int page, int size) {
+    public Page<SensorData> getAllData(int page, int size) {
         return repository.findAll(
                 org.springframework.data.domain.PageRequest.of(page, size,
                         org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createTime"))
-        ).getContent();
+        );
     }
 
     /** 获取统计数据 */
