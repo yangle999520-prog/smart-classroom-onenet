@@ -106,6 +106,7 @@
 
 <script>
 	const {
+		BACKEND_BASE_URL,
 		createCommonToken
 	} = require(
 		'@/key.js'
@@ -121,7 +122,10 @@
 				mode: 'auto',
 				isOperating: false, 
 				lockTimer: null,
-				/** 设备是否在线（从 OneNET /device/detail API 获取） */
+				/** 定时器ID（用于清理） */
+				fetchTimer: null,
+				statusTimer: null,
+				/** 设备是否在线（从后端 API /api/sensor/device-status 获取） */
 				deviceOnline: true,
 				/** 设备状态文本 */
 				deviceStatusText: '在线'
@@ -143,16 +147,40 @@
 			this.token = createCommonToken(params);
 		},
 		onShow(){
+			// 先清理旧的定时器，防止重复创建
+			this.clearTimers();
 			this.fetchDevData();
 			this.checkDeviceStatus();
-			setInterval(()=>{
+			this.fetchTimer = setInterval(() => {
 				this.fetchDevData();
-			},3000)
-			setInterval(()=>{
+			}, 3000);
+			this.statusTimer = setInterval(() => {
 				this.checkDeviceStatus();
-			},10000)
+			}, 10000);
+		},
+		onHide(){
+			// 页面隐藏时清理定时器，下次 onShow 重新创建
+			this.clearTimers();
+		},
+		onUnload(){
+			this.clearTimers();
 		},
 		methods: {
+			/** 清理所有定时器 */
+			clearTimers() {
+				if (this.fetchTimer) {
+					clearInterval(this.fetchTimer);
+					this.fetchTimer = null;
+				}
+				if (this.statusTimer) {
+					clearInterval(this.statusTimer);
+					this.statusTimer = null;
+				}
+				if (this.lockTimer) {
+					clearTimeout(this.lockTimer);
+					this.lockTimer = null;
+				}
+			},
 			startOperatingLock() {
 				this.isOperating = true;
 				if (this.lockTimer) clearTimeout(this.lockTimer);
@@ -161,29 +189,19 @@
 				}, 3500);
 			},
 
-			/** 查询设备在线状态（OneNET /device/detail API） */
+			/** 查询设备在线状态（通过后端 API 代理） */
 			checkDeviceStatus() {
 				uni.request({
-					url: 'https://iot-api.heclouds.com/device/detail', 
+					url: BACKEND_BASE_URL + '/api/sensor/device-status',
 					method:'GET',
-					data: {
-						product_id:'6x3n4Y0FuX',
-						device_name:'D1'
-					},
-					header: {
-						'authorization': this.token 
-					},
 					success: (res) => {
-						if(res.data && res.data.data) {
-							const status = res.data.data.status;
-							// status: 0=离线, 1=在线, 2=未激活
-							this.deviceOnline = (status === 1);
-							switch(status) {
-								case 0: this.deviceStatusText = '离线'; break;
-								case 1: this.deviceStatusText = '在线'; break;
-								case 2: this.deviceStatusText = '未激活'; break;
-								default: this.deviceStatusText = '未知'; break;
-							}
+						if(res.data && res.data.code === 200 && res.data.data) {
+							const status = res.data.data;
+							this.deviceOnline = (status.online === true);
+							this.deviceStatusText = status.statusText || '未知';
+						} else {
+							this.deviceOnline = false;
+							this.deviceStatusText = '接口异常';
 						}
 					},
 					fail: () => {
@@ -196,41 +214,26 @@
 
 			fetchDevData(){
 				uni.request({
-					url: 'https://iot-api.heclouds.com/thingmodel/query-device-property', 
+					url: BACKEND_BASE_URL + '/api/sensor/latest',
 					method:'GET',
-					data: {
-						product_id:'6x3n4Y0FuX',
-						device_name:'D1'
-					},
-					header: {
-						'authorization': this.token 
-					},
 					success: (res) => {
-						if(res.data && res.data.data) {
-							const dataList = res.data.data;
-							
-							const tempProp = dataList.find(item => item.identifier === 'temp');
-							const lightProp = dataList.find(item => item.identifier === 'light');
-							const ledProp = dataList.find(item => item.identifier === 'led');
-							const modeProp = dataList.find(item => item.identifier === 'mode');
-							
-							if(tempProp) this.temp = tempProp.value;
-							if(lightProp) this.light = lightProp.value;
-							
+						if(res.data && res.data.code === 200 && res.data.data) {
+							const d = res.data.data;
+							this.temp = d.temperature != null ? d.temperature.toString() : '0';
+							this.light = d.light != null ? d.light.toString() : '0';
+
 							// 仅在非操作锁定期间更新控制类状态
 							if (!this.isOperating) {
-								if(ledProp) {
-									this.led = (ledProp.value === 'true' || ledProp.value === true || ledProp.value === '1');
-								}
-								if(modeProp) {
-									// 🌟 调整接收逻辑：云端返回 true/'true'/'1' 对应本地的 'manual' 手动模式，否则为 'auto' 自动
-									const isTrueValue = (modeProp.value === 'true' || modeProp.value === true || modeProp.value === '1');
-									this.mode = isTrueValue ? 'manual' : 'auto';
-								}
+								this.led = (d.ledStatus === 1);
+								this.mode = (d.mode === 1) ? 'manual' : 'auto';
 							}
-							
+
 							this.lastUpdateTime = this.formatTime(new Date());
 						}
+					},
+					fail: () => {
+						// 请求失败时不做处理，保持上次数据不变
+						console.log('后端数据获取失败');
 					}
 				});
 			},

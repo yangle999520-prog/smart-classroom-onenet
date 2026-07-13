@@ -286,6 +286,71 @@ const connected = computed(() => deviceStatus.value.online)
 
 let pollTimer = null
 let deviceStatusTimer = null
+let ws = null
+let wsReconnectTimer = null
+
+/** WebSocket 更新节流：至少间隔 500ms 才更新一次页面 */
+let lastWsUpdateTime = 0
+const WS_UPDATE_THROTTLE_MS = 500
+
+// ==================== WebSocket 实时推送 ====================
+
+/** 建立 WebSocket 连接 */
+function connectWebSocket() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsUrl = `${protocol}//${window.location.host}/ws/sensor`
+
+  try {
+    ws = new WebSocket(wsUrl)
+
+    ws.onopen = () => {
+      console.log('📡 WebSocket 已连接')
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data)
+        if (msg.type === 'sensor_update') {
+          // 节流控制：500ms 内不重复更新，让界面有节奏感
+          const now = Date.now()
+          if (now - lastWsUpdateTime < WS_UPDATE_THROTTLE_MS) {
+            return
+          }
+          lastWsUpdateTime = now
+
+          // WebSocket 实时推送：直接更新最新数据和统计
+          latestData.value = {
+            temperature: msg.temperature,
+            light: msg.light,
+            ledStatus: msg.ledStatus,
+            mode: msg.mode,
+            createTime: msg.createTime
+          }
+          // 数据总量 +1（实时递增，不需等 HTTP 轮询）
+          if (statistics.value.totalRecords !== undefined) {
+            statistics.value.totalRecords++
+          }
+        }
+      } catch (e) {
+        console.warn('WebSocket 消息解析失败:', e)
+      }
+    }
+
+    ws.onclose = () => {
+      console.log('📡 WebSocket 已断开，3 秒后重连...')
+      ws = null
+      wsReconnectTimer = setTimeout(connectWebSocket, 3000)
+    }
+
+    ws.onerror = () => {
+      console.warn('📡 WebSocket 连接异常')
+      ws && ws.close()
+    }
+  } catch (e) {
+    console.warn('WebSocket 创建失败，3 秒后重试:', e)
+    wsReconnectTimer = setTimeout(connectWebSocket, 3000)
+  }
+}
 
 // ==================== 温度状态 ====================
 const tempStatus = computed(() => {
@@ -364,21 +429,31 @@ const thresholdStyle = computed(() => {
 // ==================== 数据加载 ====================
 async function loadData() {
   try {
-    const [latest, stats, list] = await Promise.all([
-      getLatestData(),
-      getStatistics(),
-      getDataList(0, 20)
-    ])
+    // 分别请求，互不影响，一个失败不影响其他数据更新
+    const latestResp = getLatestData().catch(e => {
+      console.warn('latest数据加载失败:', e.message)
+      return null
+    })
+    const statsResp = getStatistics().catch(e => {
+      console.warn('统计数据加载失败:', e.message)
+      return null
+    })
+    const listResp = getDataList(0, 20).catch(e => {
+      console.warn('历史数据加载失败:', e.message)
+      return null
+    })
 
-    if (latest) {
+    const [latest, stats, list] = await Promise.all([latestResp, statsResp, listResp])
+
+    if (latest !== null) {
       latestData.value = latest
     }
 
-    if (stats) {
+    if (stats !== null) {
       statistics.value = stats
     }
 
-    if (list) {
+    if (list !== null) {
       recentList.value = list
     }
   } catch (e) {
@@ -403,9 +478,11 @@ async function checkDeviceStatus() {
 onMounted(() => {
   loadData()
   checkDeviceStatus()
-  // 每10秒轮询最新数据
-  pollTimer = setInterval(loadData, 10000)
-  // 每10秒检测设备在线状态
+  // 连接 WebSocket 接收实时推送（主要数据通道，500ms 节流展示）
+  connectWebSocket()
+  // HTTP 轮询仅作为 WebSocket 断线时的降级方案，不必频繁请求
+  pollTimer = setInterval(loadData, 30000)
+  // 每 10 秒检测设备在线状态
   deviceStatusTimer = setInterval(checkDeviceStatus, 10000)
 })
 
@@ -417,6 +494,14 @@ onUnmounted(() => {
   if (deviceStatusTimer) {
     clearInterval(deviceStatusTimer)
     deviceStatusTimer = null
+  }
+  if (ws) {
+    ws.close()
+    ws = null
+  }
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer)
+    wsReconnectTimer = null
   }
 })
 </script>

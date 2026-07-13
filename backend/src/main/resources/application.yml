@@ -22,20 +22,26 @@ spring:
       schema-locations: classpath:schema.sql
 
 # ==================== 数据模拟器配置 ====================
-# 接入真实OneNET后设为false，避免重复数据
 simulator:
   enabled: false
 
-# ==================== OneNET HTTP API 数据拉取 ====================
-# 与小程序使用完全相同的接口，自动生成签名token
-# 当前已用你的真实参数配置完毕，重启后端即可运行！
+# ==================== OneNET Pulsar 服务端订阅 ====================
+# 替代 HTTP 轮询，设备上报数据时 OneNET 主动推送到后端
+# 配置项从 OneNET 平台「服务端订阅」页面获取
 onenet:
+  pulsar:
+    enabled: true                              # ✅ 启用 Pulsar 服务端订阅
+    access-id: 2lFXZoUzYYKGQdM13732            # 消费组 ID（请替换为你的真实值）
+    secret-key: 6eda6669cc664200890300a41715e294 # 消费组密钥（请替换为你的真实值）
+    subscription: 2lFXZoUzYYKGQdM13732-sub     # 订阅名称（请替换为你的真实值）
+
+  # ==================== OneNET HTTP API（仅设备状态查询） ====================
+  # 数据获取已切换至 Pulsar 服务端订阅
+  # 此处仅用于 /api/sensor/device-status 接口查询设备在线状态
   api:
-    enabled: false                              # ✅ 已启用
+    enabled: true                               # ✅ 需要设备状态查询时保持启用
     base-url: https://iot-api.heclouds.com
-    product-id: 6x3n4Y0FuX                    # ✅ 你的产品ID
-    device-name: D1                            # ✅ 你的设备名称
-    access-key: mVGNFVfJaWdrvdWZPftvTauZ5b0ZU8mVyRlD5SEr5Vc=  # ✅ 你的AccessKey
-    version: 2022-05-01                        # ✅ API版本
-
-
+    product-id: 6x3n4Y0FuX                     # 产品ID
+    device-name: D1                             # 设备名称
+    access-key: mVGNFVfJaWdrvdWZPftvTauZ5b0ZU8mVyRlD5SEr5Vc=  # AccessKey
+    version: 2022-05-01

@@ -1,5 +1,12 @@
 const crypto = require('crypto')
 
+/**
+ * 后端 Spring Boot 服务器地址
+ * 小程序运行在手机上，不能使用 localhost，需填本机实际局域网 IP
+ * 例如后端运行在 192.168.1.100:8080，就填 http://192.168.1.100:8080
+ */
+const BACKEND_BASE_URL = 'http://192.168.0.111:8080'
+
 function createCommonToken(params) {
     const access_key = Buffer.from( params.access_key, "base64")
 
@@ -20,6 +27,7 @@ function createCommonToken(params) {
 }
 
 module.exports = {
+  BACKEND_BASE_URL,
   createCommonToken
 };
 

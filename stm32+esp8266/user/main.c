@@ -10,6 +10,14 @@
 
 #define ESP8266_ONENET_INFO "AT+CIPSTART=\"TCP\",\"studio-mqtt.heclouds.com\",1883\r\n"
 
+/* 上报节奏匹配前端显示间隔 */
+#define SAMPLE_INTERVAL       10u    /* 每 10 个循环采集一次传感器（约100ms） */
+#define UPLOAD_INTERVAL       40u    /* 每 40 个循环上报一次数据（约400ms，+管道延迟≈0.5s） */
+#define LOG_INTERVAL          100u   /* 每 100 个循环打印一次日志（约1s） */
+
+/* 主循环单步延时 */
+#define LOOP_DELAY_MS         10u
+
 float temp = 0.0f;
 uint16_t light = 0;
 
@@ -58,8 +66,8 @@ int main(void)
 		if(dataPtr != NULL)
 			OneNet_RevPro(dataPtr);
 
-		/* Sample sensors about every 100 ms. */
-		if(++sensorTick >= 10)
+		/* Sample sensors */
+		if(++sensorTick >= SAMPLE_INTERVAL)
 		{
 			sensorTick = 0;
 			light = LightSensor_ReadPercent();
@@ -81,16 +89,16 @@ int main(void)
 			}
 		}
 
-		/* Upload about every 5 s. */
-		if(++uploadTick >= 300)
+		/* 最快速度上报（约100ms一次） */
+		if(++uploadTick >= UPLOAD_INTERVAL)
 		{
+			uploadTick = 0;
 			UsartPrintf(USART_DEBUG, "OneNet_SendData\r\n");
 			OneNet_SendData();
-			uploadTick = 0;
 		}
 
-		/* Print status about every 1 s. */
-		if(++logTick >= 100)
+		/* Print status */
+		if(++logTick >= LOG_INTERVAL)
 		{
 			logTick = 0;
 			UsartPrintf(USART_DEBUG,
@@ -98,6 +106,6 @@ int main(void)
 						ledMode, temp, light, ledState);
 		}
 
-		DelayXms(10);
+		DelayXms(LOOP_DELAY_MS);
 	}
 }
