@@ -47,6 +47,7 @@ public class DataSimulator implements CommandLineRunner {
             int hour = time.getHour();
             int light;
             int ledStatus;
+            int mode = 0;   // 默认自动模式
             if (hour >= 8 && hour <= 18) {
                 // 白天：60~100%
                 light = 60 + random.nextInt(41);
@@ -74,6 +75,7 @@ public class DataSimulator implements CommandLineRunner {
             data.setTemperature((float) Math.round(temperature * 10) / 10.0f);
             data.setLight(light);
             data.setLedStatus(ledStatus);
+            data.setMode(mode);
             data.setCreateTime(time);
 
             sensorDataService.saveData(data);

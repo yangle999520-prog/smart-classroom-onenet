@@ -86,6 +86,28 @@
         </div>
       </div>
 
+      <!-- 模式卡片 -->
+      <div class="data-card mode-card">
+        <div class="card-content">
+          <div class="card-icon-wrapper mode-icon">
+            <span class="card-icon">⚙️</span>
+          </div>
+          <div class="card-info">
+            <div class="card-label">工作模式</div>
+            <div class="card-value">
+              <span class="mode-badge" :class="modeClass">
+                {{ modeText }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="indicator">
+            {{ modeDesc }}
+          </span>
+        </div>
+      </div>
+
       <!-- 系统统计卡片 -->
       <div class="data-card stats-card">
         <div class="card-content">
@@ -143,6 +165,13 @@
               </td>
             </tr>
             <tr>
+              <td>⚙️ 模式</td>
+              <td><strong>{{ modeText }}</strong></td>
+              <td>
+                <span class="tag" :class="modeTag">{{ modeDesc }}</span>
+              </td>
+            </tr>
+            <tr>
               <td>🕐 采集时间</td>
               <td colspan="2">{{ formatTime(latestData.createTime) }}</td>
             </tr>
@@ -154,15 +183,22 @@
       </div>
 
       <div class="detail-card card">
-        <div class="card-title">⚙️ 照明控制逻辑</div>
+        <div class="card-title">⚙️ 工作模式与控制逻辑</div>
         <div class="logic-box">
+          <div class="logic-item mode-info">
+            <div class="mode-row">
+              <span class="mode-label" :class="modeClass">{{ modeText }}</span>
+            </div>
+            <span class="logic-desc">{{ modeDesc }}</span>
+          </div>
+          <div class="logic-divider"></div>
           <div class="logic-item">
-            <code>if (light &lt; 30) → LED ON</code>
-            <span class="logic-desc">光照低于30%时自动开灯</span>
+            <code>自动模式 mode=0 ：根据光照自动控制</code>
+            <span class="logic-desc">光照 &lt; 30% → 开灯，光照 ≥ 30% → 关灯</span>
           </div>
           <div class="logic-item">
-            <code>if (light &gt;= 30) → LED OFF</code>
-            <span class="logic-desc">光照充足时（≥30%）自动关灯</span>
+            <code>手动模式 mode=1 ：OneNET远程控制</code>
+            <span class="logic-desc">通过云平台下发 led=true/false 直接控制灯光</span>
           </div>
         </div>
         <div class="threshold-bar">
@@ -198,6 +234,7 @@
               <th>温度(°C)</th>
               <th>光照(%)</th>
               <th>LED状态</th>
+              <th>工作模式</th>
               <th>采集时间</th>
             </tr>
           </thead>
@@ -209,6 +246,10 @@
               <td>
                 <span class="led-dot" :class="item.ledStatus === 1 ? 'on' : 'off'"></span>
                 {{ item.ledStatus === 1 ? '开' : '关' }}
+              </td>
+              <td>
+                <span class="mode-dot" :class="item.mode === 1 ? 'manual' : 'auto'"></span>
+                {{ item.mode === 1 ? '手动' : '自动' }}
               </td>
               <td>{{ formatTime(item.createTime) }}</td>
             </tr>
@@ -281,6 +322,24 @@ const ledClass = computed(() => latestData.value.ledStatus === 1 ? 'led-on' : 'l
 const ledText = computed(() => latestData.value.ledStatus === 1 ? '已开启' : '已关闭')
 const ledClassDot = computed(() => ledClass.value)
 const ledClassTag = computed(() => ledClass.value)
+
+// ==================== 工作模式 ====================
+const modeClass = computed(() => {
+  const m = latestData.value.mode
+  if (m === null || m === undefined) return 'mode-auto'
+  return m === 1 ? 'mode-manual' : 'mode-auto'
+})
+const modeText = computed(() => {
+  const m = latestData.value.mode
+  if (m === null || m === undefined) return '--'
+  return m === 1 ? '手动模式' : '自动模式'
+})
+const modeDesc = computed(() => {
+  const m = latestData.value.mode
+  if (m === null || m === undefined) return '--'
+  return m === 1 ? '手动控制中，由OneNET远程操控' : '根据环境光照自动调节灯光'
+})
+const modeTag = computed(() => modeClass.value)
 
 // ==================== 光照阈值进度条 ====================
 const thresholdStyle = computed(() => {
@@ -407,7 +466,7 @@ onUnmounted(() => {
 /* ==================== 数据卡片 ==================== */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
 }
 
@@ -444,6 +503,7 @@ onUnmounted(() => {
 .temp-icon { background: linear-gradient(135deg, #fff3e0, #ffe0b2); }
 .light-icon { background: linear-gradient(135deg, #fff8e1, #ffecb3); }
 .led-icon { background: linear-gradient(135deg, #e3f2fd, #bbdefb); }
+.mode-icon { background: linear-gradient(135deg, #f3e5f5, #e1bee7); }
 .stats-icon { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); }
 
 .card-info {
@@ -518,7 +578,72 @@ onUnmounted(() => {
 .indicator-dot.led-on { background: #1565c0; }
 .indicator-dot.led-off { background: #90a4ae; }
 
-/* ==================== 详情区域 ==================== */
+/* ==================== 模式卡片 ==================== */
+.mode-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mode-badge.mode-auto {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.mode-badge.mode-manual {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.mode-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.mode-dot.auto { background: #4caf50; }
+.mode-dot.manual { background: #ff9800; }
+
+.mode-info {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.mode-row {
+  margin-bottom: 6px;
+}
+
+.mode-label {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mode-label.mode-auto {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.mode-label.mode-manual {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.logic-divider {
+  height: 1px;
+  background: #e0e0e0;
+  margin: 4px 0;
+}
+
+/* ==================== 最近记录 ==================== */
 .detail-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -566,6 +691,8 @@ onUnmounted(() => {
 .danger-tag { background: #ffebee; color: #c62828; }
 .led-on { background: #e3f2fd; color: #1565c0; }
 .led-off { background: #eceff1; color: #607d8b; }
+.mode-auto-tag { background: #e8f5e9; color: #2e7d32; }
+.mode-manual-tag { background: #fff3e0; color: #e65100; }
 
 .no-data {
   padding: 30px 0;
@@ -686,7 +813,13 @@ onUnmounted(() => {
 .led-dot.off { background: #90a4ae; }
 
 /* ==================== 响应式 ==================== */
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
+  .cards-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
   .cards-grid {
     grid-template-columns: repeat(2, 1fr);
   }

@@ -165,6 +165,7 @@ public class OneNetApiService {
             Float temperature = null;
             Integer light = null;
             Integer ledStatus = null;
+            Integer mode = 0;   // 默认自动模式
 
             for (Map<String, Object> item : dataList) {
                 String identifier = (String) item.get("identifier");
@@ -190,6 +191,13 @@ public class OneNetApiService {
                             ledStatus = rawValue.toString().equals("true") ? 1 : 0;
                         }
                         break;
+                    case "mode":
+                        if (rawValue instanceof Boolean) {
+                            mode = (Boolean) rawValue ? 1 : 0;
+                        } else {
+                            mode = rawValue.toString().equals("true") ? 1 : 0;
+                        }
+                        break;
                 }
             }
 
@@ -198,9 +206,9 @@ public class OneNetApiService {
             }
 
             if (temperature != null && light != null) {
-                SensorData data = new SensorData(temperature, light, ledStatus != null ? ledStatus : 0);
+                SensorData data = new SensorData(temperature, light, ledStatus != null ? ledStatus : 0, mode);
                 sensorDataService.saveData(data);
-                log.info("✅✅✅ OneNET数据已保存: {}°C, {}lux, LED={}", temperature, light, ledStatus);
+                log.info("✅✅✅ OneNET数据已保存: {}°C, {}lux, LED={}, mode={}", temperature, light, ledStatus, mode);
                 return true;
             } else {
                 log.warn("   数据不完整(temp={}, light={})，跳过保存", temperature, light);

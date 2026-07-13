@@ -10,5 +10,6 @@
 void DS18B20_Init(void);
 uint8_t DS18B20_StartConvert(void);
 float DS18B20_ReadTemperature(void);
+uint8_t DS18B20_ReadTemperatureNonBlocking(float *temperature);
 
 #endif

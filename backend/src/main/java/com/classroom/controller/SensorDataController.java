@@ -39,8 +39,10 @@ public class SensorDataController {
                     Integer.parseInt(body.get("light").toString()) : 0;
             Integer ledStatus = body.containsKey("ledStatus") || body.containsKey("led") ?
                     Integer.parseInt(body.getOrDefault("ledStatus", body.get("led")).toString()) : 0;
+            Integer mode = body.containsKey("mode") ?
+                    Integer.parseInt(body.get("mode").toString()) : 0;
 
-            SensorData data = new SensorData(temperature, light, ledStatus);
+            SensorData data = new SensorData(temperature, light, ledStatus, mode);
             SensorData saved = sensorDataService.saveData(data);
 
             response.put("code", 200);

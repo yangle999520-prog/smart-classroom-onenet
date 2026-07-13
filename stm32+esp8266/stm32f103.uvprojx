@@ -138,7 +138,7 @@
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2CM3.DLL</Flash2>
-          <Flash3></Flash3>
+          <Flash3>"" ()</Flash3>
           <Flash4></Flash4>
           <pFcarmOut></pFcarmOut>
           <pFcarmGrp></pFcarmGrp>
@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F10X_MD, USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>.\core;.\fwlib\inc;.\hardware\inc;.\user;.\NET\onenet\inc;.\NET\MQTT;.\NET\device\inc</IncludePath>
+              <IncludePath>.\core;.\fwlib\inc;.\hardware\inc;.\user;.\NET\onenet\inc;.\NET\MQTT;.\NET\device\inc;.\NET\cjson</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -451,14 +451,14 @@
               <FilePath>.\hardware\src\usart.c</FilePath>
             </File>
             <File>
-              <FileName>led.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\hardware\src\led.c</FilePath>
-            </File>
-            <File>
               <FileName>ds18b20.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\hardware\src\ds18b20.c</FilePath>
+            </File>
+            <File>
+              <FileName>led.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\hardware\src\led.c</FilePath>
             </File>
             <File>
               <FileName>light_sensor.c</FileName>
@@ -514,6 +514,16 @@
               <FileName>esp8266.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\NET\device\src\esp8266.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>cjson</GroupName>
+          <Files>
+            <File>
+              <FileName>cJSON.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\NET\cjson\cJSON.c</FilePath>
             </File>
           </Files>
         </Group>

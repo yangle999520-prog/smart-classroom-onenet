@@ -66,6 +66,7 @@ public class SensorDataService {
         double avgLight = recentData.stream().mapToInt(SensorData::getLight).average().orElse(0);
 
         long ledOnCount = recentData.stream().filter(d -> d.getLedStatus() == 1).count();
+        long manualModeCount = recentData.stream().filter(d -> d.getMode() == 1).count();
 
         stats.put("totalRecords", repository.count());
         stats.put("avgTemperature24h", String.format("%.1f", avgTemp));
@@ -73,6 +74,7 @@ public class SensorDataService {
         stats.put("minTemperature24h", String.format("%.1f", minTemp));
         stats.put("avgLight24h", String.format("%.0f", avgLight));
         stats.put("ledOnRate24h", String.format("%.1f", recentData.isEmpty() ? 0 : (ledOnCount * 100.0 / recentData.size())));
+        stats.put("currentMode", recentData.get(0).getMode());  // 最新一条的模式
 
         return stats;
     }

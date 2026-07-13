@@ -20,6 +20,9 @@ public class SensorData {
     @Column(name = "led_status", nullable = false)
     private Integer ledStatus;
 
+    @Column(nullable = false)
+    private Integer mode = 0;   // 0=自动模式, 1=手动模式
+
     @Column(name = "create_time")
     private LocalDateTime createTime;
 
@@ -30,6 +33,14 @@ public class SensorData {
         this.temperature = temperature;
         this.light = light;
         this.ledStatus = ledStatus;
+        this.mode = 0;  // 默认自动模式
+    }
+
+    public SensorData(Float temperature, Integer light, Integer ledStatus, Integer mode) {
+        this.temperature = temperature;
+        this.light = light;
+        this.ledStatus = ledStatus;
+        this.mode = mode;
     }
 
     @PrePersist
@@ -70,6 +81,14 @@ public class SensorData {
 
     public void setLedStatus(Integer ledStatus) {
         this.ledStatus = ledStatus;
+    }
+
+    public Integer getMode() {
+        return mode;
+    }
+
+    public void setMode(Integer mode) {
+        this.mode = mode;
     }
 
     public LocalDateTime getCreateTime() {

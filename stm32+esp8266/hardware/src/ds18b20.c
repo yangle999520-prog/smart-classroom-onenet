@@ -9,6 +9,8 @@ static uint8_t DS18B20_ReadBit(void);
 static void DS18B20_WriteByte(uint8_t data);
 static uint8_t DS18B20_ReadByte(void);
 static uint8_t DS18B20_ResetPulse(void);
+static uint8_t ds18b20_conversion_started = 0;
+static uint16_t ds18b20_conversion_ticks = 0;
 
 void DS18B20_Init(void)
 {
@@ -55,6 +57,54 @@ float DS18B20_ReadTemperature(void)
     raw_value = (short)((high_byte << 8) | low_byte);
 
     return (float)raw_value / 16.0f;
+}
+
+uint8_t DS18B20_ReadTemperatureNonBlocking(float *temperature)
+{
+    uint8_t low_byte;
+    uint8_t high_byte;
+    short raw_value;
+
+    if (temperature == 0)
+    {
+        return 0;
+    }
+
+    if (!ds18b20_conversion_started)
+    {
+        if (!DS18B20_StartConvert())
+        {
+            return 0;
+        }
+
+        ds18b20_conversion_started = 1;
+        ds18b20_conversion_ticks = 75; /* main loop uses DelayXms(10), 75 ticks ~= 750ms */
+        return 0;
+    }
+
+    if (ds18b20_conversion_ticks > 0)
+    {
+        ds18b20_conversion_ticks--;
+        return 0;
+    }
+
+    if (!DS18B20_ResetPulse())
+    {
+        ds18b20_conversion_started = 0;
+        return 0;
+    }
+
+    DS18B20_WriteByte(0xCC);
+    DS18B20_WriteByte(0xBE);
+
+    low_byte = DS18B20_ReadByte();
+    high_byte = DS18B20_ReadByte();
+    raw_value = (short)((high_byte << 8) | low_byte);
+
+    *temperature = (float)raw_value / 16.0f;
+    ds18b20_conversion_started = 0;
+
+    return 1;
 }
 
 static void DS18B20_PinOutput(void)
